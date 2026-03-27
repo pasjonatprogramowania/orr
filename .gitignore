@@ -12,7 +12,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.so
-01_Opis_zadania.html
+
 # Pliki z danymi (aby nie wgrywać 1.6 GB na GitHuba)
 data/
 *.txt
