@@ -1,0 +1,34 @@
+# Pliki robocze zadania
+01_Opis_zadania.html
+sprawko.md
+
+# Wirtualne środowiska
+venv/
+env/
+.env
+
+# Pliki tymczasowe Pythona
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+01_Opis_zadania.html
+# Pliki z danymi (aby nie wgrywać 1.6 GB na GitHuba)
+data/
+*.txt
+*.csv
+# Wyniki działania i statystyki benchmarków
+results/
+*.graphml
+*.gml
+
+# Cache testów
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Środowisko deweloperskie / IDE
+.vscode/
+.idea/
+*.swp
+.DS_Store
