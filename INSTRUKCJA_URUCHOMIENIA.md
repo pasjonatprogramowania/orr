@@ -85,3 +85,21 @@ python benchmarks/bench_sequential.py --runs 3
 ```
 
 *Oczekiwany efekt: Skrypt wykona po 3 pomiary dla `data/small` oraz `data/medium`, wypisze ładną tabelę wyników w konsoli i zapisze surowe dane w `results/bench_sequential.csv`.*
+
+---
+
+## Krok 6: Uruchomienie rozwiązania równoległego (Parallel MVP)
+
+Zwieńczeniem zadania jest wykonanie stworzonego MVP dla przetwarzania równoległego. Algorytm w pętli przetworzy Baseline (dla pewności czasu początkowego), a następnie przetestuje proces podziału plików wielowątkowo na zadeklarowanych wartościach *chunksize* oraz w przydziałach od 2 do 16 procesów. Skrypt wyświetli w konsoli ustrukturyzowaną tabelę z przyspieszeniami i statusem autoweryfikacji.
+
+Aby uruchomić test szybkości na danych **niskiego kalibru** (Proof Of Concept poprawności):
+
+```powershell
+venv\Scripts\python.exe parallel_benchmark.py --data data/small
+```
+
+Aby uruchomić docelowy sprawdzian faktycznego zrównoleglenia (obciążeniowy):
+
+```powershell
+venv\Scripts\python.exe parallel_benchmark.py --data data/medium
+```
