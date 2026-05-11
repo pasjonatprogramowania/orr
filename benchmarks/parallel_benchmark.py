@@ -10,7 +10,7 @@ import networkx as nx
 from src.pipeline import build_nlp, process_file, load_text
 from src.extractor import extract_graph_data
 from src.merge import merge_graphs, dict_to_graph
-from baseline_sequential import run_sequential
+from .baseline_sequential import run_sequential
 
 # Zmienna globalna w obrębie procesu-workera
 _nlp = None

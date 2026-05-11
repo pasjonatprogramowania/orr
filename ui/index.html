@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KG Pipeline UI</title>
+    <script src="https://unpkg.com/cytoscape/dist/cytoscape.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #e2e8f0; }
+        #cy { width: 100%; height: 600px; background-color: #1e293b; border-radius: 0.5rem; border: 1px solid #334155; }
+        .panel { background-color: #1e293b; border-radius: 0.5rem; padding: 1.5rem; border: 1px solid #334155; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+    </style>
+</head>
+<body class="p-6">
+    <div class="max-w-7xl mx-auto space-y-6">
+        <header class="flex justify-between items-end">
+            <div>
+                <h1 class="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">Knowledge Graph Pipeline</h1>
+                <p class="text-slate-400 mt-1">Distributed & Parallel Processing Visualizer</p>
+            </div>
+            <div id="status" class="px-3 py-1 rounded-full text-sm font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Ready</div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            <!-- Controls Panel -->
+            <div class="panel lg:col-span-1 space-y-5">
+                <h2 class="text-xl font-semibold mb-4 text-slate-200">Runner</h2>
+                
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-400 mb-1">Dataset</label>
+                        <select id="dataset" class="w-full bg-slate-800 border border-slate-700 rounded p-2 text-slate-200">
+                            <option value="small">Small (5 files)</option>
+                            <option value="medium">Medium (45 files)</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-slate-400 mb-1">Mode</label>
+                        <select id="mode" class="w-full bg-slate-800 border border-slate-700 rounded p-2 text-slate-200">
+                            <option value="sequential">Sequential (Baseline)</option>
+                            <option value="parallel">Parallel (Shared Mem)</option>
+                            <option value="distributed">Distributed (IPC/Pickle)</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-slate-400 mb-1">Workers (CPU)</label>
+                        <input type="number" id="workers" value="4" min="1" max="16" class="w-full bg-slate-800 border border-slate-700 rounded p-2 text-slate-200">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-slate-400 mb-1">Batch Size</label>
+                        <input type="number" id="batch" value="2" min="1" class="w-full bg-slate-800 border border-slate-700 rounded p-2 text-slate-200">
+                    </div>
+                </div>
+
+                <button id="runBtn" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-2 px-4 rounded transition-colors mt-4">
+                    Run Pipeline
+                </button>
+
+                <div id="results" class="mt-4 hidden space-y-2 text-sm">
+                    <h3 class="font-semibold text-slate-300 border-b border-slate-700 pb-1">Results</h3>
+                    <div class="flex justify-between"><span class="text-slate-400">Time Total:</span> <span id="res-time" class="font-mono text-emerald-400"></span></div>
+                    <div class="flex justify-between"><span class="text-slate-400">Time Extract:</span> <span id="res-extract" class="font-mono"></span></div>
+                    <div class="flex justify-between"><span class="text-slate-400">Time Merge:</span> <span id="res-merge" class="font-mono"></span></div>
+                    <div class="flex justify-between text-xs text-slate-500 mt-2"><span id="res-nodes"></span> nodes, <span id="res-edges"></span> edges</div>
+                </div>
+            </div>
+
+            <!-- Visualization Panel -->
+            <div class="panel lg:col-span-3 flex flex-col">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-semibold text-slate-200">Graph Visualization</h2>
+                    <div class="text-xs text-slate-400 space-x-3">
+                        <span class="inline-flex items-center"><span class="w-3 h-3 rounded-full bg-blue-500 mr-1"></span> ORG</span>
+                        <span class="inline-flex items-center"><span class="w-3 h-3 rounded-full bg-emerald-500 mr-1"></span> PERSON</span>
+                        <span class="inline-flex items-center"><span class="w-3 h-3 rounded-full bg-purple-500 mr-1"></span> GPE</span>
+                    </div>
+                </div>
+                <div id="cy" class="flex-grow"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let cy = cytoscape({
+            container: document.getElementById('cy'),
+            style: [
+                {
+                    selector: 'node',
+                    style: {
+                        'label': 'data(label)',
+                        'font-size': '10px',
+                        'color': '#cbd5e1',
+                        'text-outline-width': 2,
+                        'text-outline-color': '#0f172a',
+                        'text-valign': 'center',
+                        'text-halign': 'center',
+                        'background-color': '#64748b',
+                        'width': 'mapData(count, 1, 10, 20, 50)',
+                        'height': 'mapData(count, 1, 10, 20, 50)',
+                    }
+                },
+                {
+                    selector: 'node[type="ORG"]', style: { 'background-color': '#3b82f6' }
+                },
+                {
+                    selector: 'node[type="PERSON"]', style: { 'background-color': '#10b981' }
+                },
+                {
+                    selector: 'node[type="GPE"]', style: { 'background-color': '#a855f7' }
+                },
+                {
+                    selector: 'edge',
+                    style: {
+                        'width': 'mapData(weight, 1, 5, 1, 4)',
+                        'line-color': '#475569',
+                        'target-arrow-color': '#475569',
+                        'target-arrow-shape': 'triangle',
+                        'curve-style': 'bezier',
+                        'opacity': 0.6
+                    }
+                }
+            ],
+            layout: { name: 'cose', animate: false }
+        });
+
+        const statusEl = document.getElementById('status');
+        const runBtn = document.getElementById('runBtn');
+        const resultsDiv = document.getElementById('results');
+
+        function updateStatus(text, type = 'info') {
+            statusEl.textContent = text;
+            statusEl.className = 'px-3 py-1 rounded-full text-sm font-medium';
+            if (type === 'running') statusEl.classList.add('bg-blue-500/10', 'text-blue-400', 'border', 'border-blue-500/20', 'animate-pulse');
+            else if (type === 'error') statusEl.classList.add('bg-red-500/10', 'text-red-400', 'border', 'border-red-500/20');
+            else statusEl.classList.add('bg-emerald-500/10', 'text-emerald-400', 'border', 'border-emerald-500/20');
+        }
+
+        runBtn.addEventListener('click', async () => {
+            const req = {
+                dataset: document.getElementById('dataset').value,
+                mode: document.getElementById('mode').value,
+                workers: parseInt(document.getElementById('workers').value),
+                batch_size: parseInt(document.getElementById('batch').value)
+            };
+
+            runBtn.disabled = true;
+            updateStatus('Running pipeline...', 'running');
+            resultsDiv.classList.add('hidden');
+
+            try {
+                const res = await fetch('/api/run', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(req)
+                });
+                
+                if (!res.ok) throw new Error(await res.text());
+                
+                const data = await res.json();
+                
+                // Show stats
+                document.getElementById('res-time').textContent = `${data.stats.time_total_s}s`;
+                document.getElementById('res-extract').textContent = `${data.stats.time_extract_s}s`;
+                document.getElementById('res-merge').textContent = `${data.stats.time_merge_s}s`;
+                document.getElementById('res-nodes').textContent = data.stats.num_nodes;
+                document.getElementById('res-edges').textContent = data.stats.num_edges;
+                resultsDiv.classList.remove('hidden');
+
+                // Render graph
+                const cyData = {
+                    nodes: data.graph.nodes.map(n => ({ data: n })),
+                    edges: data.graph.edges.map(e => ({ data: e }))
+                };
+                
+                cy.elements().remove();
+                cy.add(cyData.nodes);
+                cy.add(cyData.edges);
+                cy.layout({ name: 'cose', animate: true, animationDuration: 500 }).run();
+
+                updateStatus(`Done in ${data.stats.time_total_s}s`);
+            } catch (err) {
+                console.error(err);
+                updateStatus('Error: ' + err.message, 'error');
+            } finally {
+                runBtn.disabled = false;
+            }
+        });
+
+        // Load initial
+        document.getElementById('dataset').addEventListener('change', async (e) => {
+             updateStatus('Loading dataset graph...', 'running');
+             try {
+                const res = await fetch(`/api/graph?dataset=${e.target.value}`);
+                const data = await res.json();
+                cy.elements().remove();
+                cy.add(data.nodes.map(n => ({ data: n })));
+                cy.add(data.edges.map(e => ({ data: e })));
+                cy.layout({ name: 'cose' }).run();
+                updateStatus('Ready');
+             } catch(err) {
+                 updateStatus('Failed to load graph', 'error');
+             }
+        });
+        
+        // trigger initial load
+        document.getElementById('dataset').dispatchEvent(new Event('change'));
+    </script>
+</body>
+</html>

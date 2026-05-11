@@ -1,105 +1,85 @@
-# Instrukcja uruchomienia projektu
+# Instrukcja uruchomienia projektu (KG Pipeline)
 
-Poniższa instrukcja krok po kroku wyjaśnia, jak pobrać dane, przygotować środowisko i uruchomić wersję sekwencyjną, testy oraz benchmark.
+Projekt można uruchomić na dwa sposoby: błyskawicznie poprzez Docker (wraz z graficznym interfejsem webowym) lub lokalnie ze środowiskiem Python.
 
-## Krok 1: Przygotowanie środowiska
+## Opcja A: Uruchomienie przez Docker (Zalecane)
 
-Projekt wymaga Pythona w wersji 3.10+ (zalecane 3.12).
-Otwórz terminal (PowerShell / Command Prompt) w folderze `ORR` na pulpicie i uruchom poniższe komendy:
+Dzięki konteneryzacji nie musisz instalować lokalnie Pythona, paczek ani modelu spaCy.
 
-1. Utworzenie wirtualnego środowiska:
+1. **Uruchomienie kontenerów:**
+   Będąc w głównym katalogu projektu (`ORR`), wpisz:
 
-   ```powershell
-   python -m venv venv
+   ```bash
+   docker-compose up --build
    ```
+2. **Dostęp do UI:**
+   Aplikacja automatycznie wystawi interfejs pod adresem:
+    **http://localhost:8765**
 
-2. Aktywacja wirtualnego środowiska:
-
-   ```powershell
-   # Na Windows:
-   .\venv\Scripts\activate
-   ```
-
-3. Instalacja wszystkich wymaganych bibliotek:
-
-   ```powershell
-   pip install -r requirements.txt
-   ```
-
-4. Pobranie i instalacja modelu językowego dla `spaCy` (wymagane do przetwarzania NLP):
-
-   ```powershell
-   python -m spacy download en_core_web_sm
-   ```
+   W UI możesz interaktywnie zmieniać wielkość zbioru danych (`small`/`medium`), tryby przetwarzania (`sequential`/`parallel`/`distributed`) oraz podglądać wynikowy graf.
 
 ---
 
-## Krok 2: Pobranie i przygotowanie danych wejściowych
+## Opcja B: Uruchomienie lokalne (CLI)
 
-Skrypt samodzielnie pobiera 1.6 GB corpus tekstów z seriwsu Kaggle i podziale go na małe (`small`) oraz średnie (`medium`) zestawy testowe:
+Wymagany Python 3.10+ (zalecany 3.12).
 
-```powershell
-python download_data.py
-```
+### 1. Przygotowanie środowiska i danych
 
-*Oczekiwany efekt: Zostaną pobrane pliki i skopiowane do folderów `data/small/` (5 plików) oraz `data/medium/` (45 plików).*
-
----
-
-## Krok 3: Uruchomienie wersji sekwencyjnej (Baseline)
-
-Gdy środowisko i dane są gotowe, można przetestować właściwą logikę tworzenia grafu wiedzy pracującą tylko na 1 procesie CPU (Baseline).
-
-Aby przetworzyć mały zestaw danych (wynik zapisze się jako plik grafu `.graphml`):
+Otwórz terminal w katalogu projektu (`ORR`):
 
 ```powershell
-python baseline_sequential.py --data data/small --out results/graph_small.graphml
+# Utworzenie i aktywacja wirtualnego środowiska
+python -m venv venv
+.\venv\Scripts\activate
+
+# Instalacja zależności
+pip install -r requirements.txt
+python -m spacy download en_core_web_sm
+
+# Pobranie danych testowych
+python scripts/download_data.py
 ```
 
-Aby przetworzyć średni zestaw danych:
+### 2. Uruchamianie benchmarków
 
-```powershell
-python baseline_sequential.py --data data/medium --out results/graph_medium.graphml
-```
+Skrypty znajdują się w folderze `benchmarks/`.
 
----
-
-## Krok 4: Sprawdzenie poprawności wyników (Testy)
-
-Potwierdzenie, że ekstrakcja encji i łączenie relacji funkcjonuje zgodnie z założeniami:
-
-```powershell
-pytest tests/test_correctness.py -v
-```
-
-*Oczekiwany efekt: 11/11 testów jednostkowych przechodzi pomyślnie (`PASSED`).*
-
----
-
-## Krok 5: Uruchomienie obciążeniowego Benchmarku
-
-Zmierzenie bazowego czasu wykonania (na potrzeby przyszłych porównań z testami zrównoleglonymi):
+**Wersja Sekwencyjna (Baseline):**
 
 ```powershell
 python benchmarks/bench_sequential.py --runs 3
 ```
 
-*Oczekiwany efekt: Skrypt wykona po 3 pomiary dla `data/small` oraz `data/medium`, wypisze ładną tabelę wyników w konsoli i zapisze surowe dane w `results/bench_sequential.csv`.*
-
----
-
-## Krok 6: Uruchomienie rozwiązania równoległego (Parallel MVP)
-
-Zwieńczeniem zadania jest wykonanie stworzonego MVP dla przetwarzania równoległego. Algorytm w pętli przetworzy Baseline (dla pewności czasu początkowego), a następnie przetestuje proces podziału plików wielowątkowo na zadeklarowanych wartościach *chunksize* oraz w przydziałach od 2 do 16 procesów. Skrypt wyświetli w konsoli ustrukturyzowaną tabelę z przyspieszeniami i statusem autoweryfikacji.
-
-Aby uruchomić test szybkości na danych **niskiego kalibru** (Proof Of Concept poprawności):
+**Wersja Równoległa (Shared Memory):**
 
 ```powershell
-venv\Scripts\python.exe parallel_benchmark.py --data data/small
+# Szybki test
+python benchmarks/parallel_benchmark.py --data data/small
+
+# Pełny test
+python benchmarks/parallel_benchmark.py --data data/medium
 ```
 
-Aby uruchomić docelowy sprawdzian faktycznego zrównoleglenia (obciążeniowy):
+**Wersja Rozproszona (Master-Worker IPC):**
 
 ```powershell
-venv\Scripts\python.exe parallel_benchmark.py --data data/medium
+python benchmarks/distributed_benchmark.py --data data/medium --workers 4 --batch-size 2
+```
+
+### 3. Testy poprawności
+
+Aby upewnić się, że cała logika (włączając protokoły kolejek) działa poprawnie:
+
+```powershell
+pytest tests/ -v --tb=short
+```
+
+### 4. Lokalny Serwer UI
+
+Jeśli chcesz odpalić UI poza Dockerem:
+
+```powershell
+python ui/ui_server.py
+# Następnie wejdź na http://localhost:8765
 ```
